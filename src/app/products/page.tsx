@@ -31,155 +31,177 @@ const ShowProducts = async ({
 }: {
   searchParams: SearchParams;
 }) => {
-  const {
-    sort,
-    q: searchValue,
-    minPrice,
-    maxPrice,
-    b: brand,
-    c: category,
-    t: tag,
-  } = searchParams as {
-    [key: string]: string;
-  };
-
-  const { layout, cursor } = searchParams as { [key: string]: string };
-
-  const { sortKey, reverse } =
-    sorting.find((item) => item.slug === sort) || defaultSort;
-
-  let productsData: any;
-  let vendorsWithCounts: { vendor: string; productCount: number }[] = [];
-  let categoriesWithCounts: { category: string; productCount: number }[] = [];
-
-  if (searchValue || brand || minPrice || maxPrice || category || tag) {
-    let queryString = "";
-
-    if (minPrice || maxPrice) {
-      queryString += `variants.price:<=${maxPrice} variants.price:>=${minPrice}`;
-    }
-
-    if (searchValue) {
-      queryString += ` ${searchValue}`;
-    }
-
-    if (brand) {
-      Array.isArray(brand)
-        ? (queryString += `${brand.map((b) => `(vendor:${b})`).join(" OR ")}`)
-        : (queryString += `vendor:"${brand}"`);
-    }
-
-    if (tag) {
-      queryString += ` ${tag}`;
-    }
-
-    const query = {
-      sortKey,
-      reverse,
-      query: queryString,
-      cursor,
+  try {
+    const {
+      sort,
+      q: searchValue,
+      minPrice,
+      maxPrice,
+      b: brand,
+      c: category,
+      t: tag,
+    } = searchParams as {
+      [key: string]: string;
     };
 
-    productsData =
-      category && category !== "all"
-        ? await getCollectionProducts({
-          collection: category,
-          sortKey,
-          reverse,
-        })
-        : await getProducts(query);
+    const { layout, cursor } = searchParams as { [key: string]: string };
 
-    const uniqueVendors: string[] = [
-      ...new Set(
-        ((productsData?.products as Product[]) || []).map((product: Product) =>
-          String(product?.vendor || ""),
-        ),
-      ),
-    ];
+    const { sortKey, reverse } =
+      sorting.find((item) => item.slug === sort) || defaultSort;
 
-    const uniqueCategories: string[] = [
-      ...new Set(
-        ((productsData?.products as Product[]) || []).flatMap(
-          (product: Product) =>
-            product.collections.nodes.map(
-              (collectionNode: any) => collectionNode.title || "",
-            ),
-        ),
-      ),
-    ];
+    let productsData: any;
+    let vendorsWithCounts: { vendor: string; productCount: number }[] = [];
+    let categoriesWithCounts: { category: string; productCount: number }[] = [];
 
-    vendorsWithCounts = uniqueVendors.map((vendor: string) => {
-      const productCount = (productsData?.products || []).filter(
-        (product: Product) => product?.vendor === vendor,
-      ).length;
-      return { vendor, productCount };
-    });
+    if (searchValue || brand || minPrice || maxPrice || category || tag) {
+      let queryString = "";
 
-    categoriesWithCounts = uniqueCategories.map((category: string) => {
-      const productCount = ((productsData?.products as Product[]) || []).filter(
-        (product: Product) =>
-          product.collections.nodes.some(
-            (collectionNode: any) => collectionNode.title === category,
+      if (minPrice || maxPrice) {
+        queryString += `variants.price:<=${maxPrice} variants.price:>=${minPrice}`;
+      }
+
+      if (searchValue) {
+        queryString += ` ${searchValue}`;
+      }
+
+      if (brand) {
+        Array.isArray(brand)
+          ? (queryString += `${brand.map((b) => `(vendor:${b})`).join(" OR ")}`)
+          : (queryString += `vendor:"${brand}"`);
+      }
+
+      if (tag) {
+        queryString += ` ${tag}`;
+      }
+
+      const query = {
+        sortKey,
+        reverse,
+        query: queryString,
+        cursor,
+      };
+
+      productsData =
+        category && category !== "all"
+          ? await getCollectionProducts({
+            collection: category,
+            sortKey,
+            reverse,
+          })
+          : await getProducts(query);
+
+      const uniqueVendors: string[] = [
+        ...new Set(
+          ((productsData?.products as Product[]) || []).map((product: Product) =>
+            String(product?.vendor || ""),
           ),
-      ).length;
-      return { category, productCount };
-    });
-  } else {
-    // Fetch all products
-    productsData = await getProducts({ sortKey, reverse, cursor });
-  }
-  const categories = await getCollections();
-  const vendors = await getVendors({});
+        ),
+      ];
 
-  const tags = [
-    ...new Set(
-      (
-        productsData as { pageInfo: PageInfo; products: Product[] }
-      )?.products.flatMap((product: Product) => product.tags),
-    ),
-  ];
+      const uniqueCategories: string[] = [
+        ...new Set(
+          ((productsData?.products as Product[]) || []).flatMap(
+            (product: Product) =>
+              product.collections.nodes.map(
+                (collectionNode: any) => collectionNode.title || "",
+              ),
+          ),
+        ),
+      ];
 
-  const maxPriceData = await getHighestProductPrice();
+      vendorsWithCounts = uniqueVendors.map((vendor: string) => {
+        const productCount = (productsData?.products || []).filter(
+          (product: Product) => product?.vendor === vendor,
+        ).length;
+        return { vendor, productCount };
+      });
 
-  return (
-    <>
-      <Suspense>
-        <ProductLayouts
-          categories={categories}
-          vendors={vendors}
-          tags={tags}
-          maxPriceData={maxPriceData}
-          vendorsWithCounts={vendorsWithCounts}
-          categoriesWithCounts={categoriesWithCounts}
-        />
-      </Suspense>
+      categoriesWithCounts = uniqueCategories.map((category: string) => {
+        const productCount = ((productsData?.products as Product[]) || []).filter(
+          (product: Product) =>
+            product.collections.nodes.some(
+              (collectionNode: any) => collectionNode.title === category,
+            ),
+        ).length;
+        return { category, productCount };
+      });
+    } else {
+      // Fetch all products
+      productsData = await getProducts({ sortKey, reverse, cursor });
+    }
 
+    const categories = await getCollections();
+    const vendors = await getVendors({});
+
+    const tags = [
+      ...new Set(
+        (
+          productsData as { pageInfo: PageInfo; products: Product[] }
+        )?.products.flatMap((product: Product) => product.tags),
+      ),
+    ];
+
+    const maxPriceData = await getHighestProductPrice();
+
+    return (
+      <>
+        <Suspense>
+          <ProductLayouts
+            categories={categories}
+            vendors={vendors}
+            tags={tags}
+            maxPriceData={maxPriceData}
+            vendorsWithCounts={vendorsWithCounts}
+            categoriesWithCounts={categoriesWithCounts}
+          />
+        </Suspense>
+
+        <div className="container">
+          <div className="row">
+            <div className="col-3 hidden lg:block -mt-14">
+              <Suspense>
+                <ProductFilters
+                  categories={categories}
+                  vendors={vendors}
+                  tags={tags}
+                  maxPriceData={maxPriceData!}
+                  vendorsWithCounts={vendorsWithCounts}
+                  categoriesWithCounts={categoriesWithCounts}
+                />
+              </Suspense>
+            </div>
+
+            <div className="col-12 lg:col-9">
+              {layout === "list" ? (
+                <ProductListView searchParams={searchParams} />
+              ) : (
+                <ProductCardView searchParams={searchParams} />
+              )}
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  } catch (error) {
+    console.error('Error loading products:', error);
+    return (
       <div className="container">
         <div className="row">
-          <div className="col-3 hidden lg:block -mt-14">
-            <Suspense>
-              <ProductFilters
-                categories={categories}
-                vendors={vendors}
-                tags={tags}
-                maxPriceData={maxPriceData!}
-                vendorsWithCounts={vendorsWithCounts}
-                categoriesWithCounts={categoriesWithCounts}
-              />
-            </Suspense>
-          </div>
-
-          <div className="col-12 lg:col-9">
-            {layout === "list" ? (
-              <ProductListView searchParams={searchParams} />
-            ) : (
-              <ProductCardView searchParams={searchParams} />
-            )}
+          <div className="col-12">
+            <div className="text-center py-20">
+              <h2 className="text-2xl font-bold mb-4">Unable to load products</h2>
+              <p className="text-gray-600">
+                There was an error connecting to the store. Please try again later.
+              </p>
+              <p className="text-sm text-gray-500 mt-4">
+                Error: {error instanceof Error ? error.message : 'Unknown error'}
+              </p>
+            </div>
           </div>
         </div>
       </div>
-    </>
-  );
+    );
+  }
 };
 
 const ProductsListPage = async (props: {
